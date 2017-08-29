@@ -66,8 +66,10 @@ const int ch_color[13] =
 int nr_of_netw_per_ch[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 int nr_of_netw = 0;			// stores total nr of netw discoverd in current scan
-int wait_state = 0;			// used for 'running' animation
-char wait[5] = "/-\\|";		// used for 'running' animation
+int nr_ch1, nr_ch6,			// used to calculate the optimal channel
+    nr_ch11, nr_ch_lowest;
+int idle_state = 0;			// used for 'running' animation
+char idle[5] = "/-\\|";		// used for 'running' animation
 char nr_of_netw_buff[5];	// used to pad the nr of networks
 bool refresh_flag = false;	// used as flag when networks are refreshed
 
@@ -196,22 +198,8 @@ void setup(){
 
 
 void loop(void) {
-//	update_wait_state();
-	tft.setCursor(306, 21);
-	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
-	tft.print(wait[wait_state]);
-
-	if(wait_state < 3){
-		wait_state++;
-	}
-	else{
-		wait_state = 0;
-
-		// draw extra pixel in the center of |, because there is no pixel there for some reason
-		tft.drawPixel(308, 24, ILI9341_WHITE);
-	}
-
-	delay(100);
+	update_idle();
+//	delay(100);
 
 	if(refresh_flag){
 		refresh_flag = false;
@@ -220,28 +208,35 @@ void loop(void) {
 			Serial.printf("scan started\n");
 		#endif
 
+		update_idle();
 		// scan for networks
 		nr_of_netw = WiFi.scanNetworks(false, true);
+		update_idle();
 
 		#ifdef DEBUG
 			Serial.printf("scan done\n");
 		#endif
 	  
-		// update info about networks
-		update_general_netw_info(nr_of_netw);
-
 		// clear the screen
 		clear_netw_screen();
+		update_idle();
 
 		// run through all discovered networks, update the amount of networks per channel
 		// and draw each network on the screen
 		for(int i = 0; i < nr_of_netw; ++i){
 			nr_of_netw_per_ch[WiFi.channel(i) - 1]++;
 			draw_netw_str(WiFi.channel(i), WiFi.RSSI(i), WiFi.SSID(i).c_str(), WiFi.encryptionType(i) != ENC_TYPE_NONE);
+
+			update_idle();
 		}
+
+		// update info about networks
+		update_general_netw_info(nr_of_netw);
+		update_idle();
 
 		// update the networks per channel counters
 		update_nr_of_netw_per_ch();
+		update_idle();
 
 		// debugging info for terminal of each discovered network
 		#ifdef DEBUG
@@ -264,18 +259,60 @@ void loop(void) {
 }
 
 
+void update_idle(){
+	tft.setCursor(306, 21);
+	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+	tft.print(idle[idle_state]);
+
+	if(idle_state < 3){
+		idle_state++;
+	}
+	else{
+		idle_state = 0;
+
+		// draw extra pixel in the center of |, because there is no pixel there for some reason
+		tft.drawPixel(308, 24, ILI9341_WHITE);
+	}
+}
+
+
+
 void update_general_netw_info(int nr_of_netw){
-  // setup cursor and font
-  tft.setCursor(20, 20);
-  tft.setTextSize(1);
-  tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+	// setup cursor and font, and clear previous text
+	tft.setCursor(20, 20);
+	tft.setTextSize(1);
+	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+	tft.fillRect(20, 20, 280, 8, ILI9341_BLACK);
 
-  // pad the nr of netw with spaces on the right (always 3 char)
-  sprintf(nr_of_netw_buff, "%3d", nr_of_netw);
+	// pad the nr of netw with spaces on the right (always 3 char)
+	sprintf(nr_of_netw_buff, "%3d", nr_of_netw);
 
-  // print the info on the screen
-  tft.print(nr_of_netw_buff);
-  tft.print(" network(s) found -- suggested ch: 1, 6, 11");
+	// calculate best netw (least crowded on ch 1, 6, 11)
+	nr_ch1  = nr_of_netw_per_ch[0];
+	nr_ch6  = nr_of_netw_per_ch[5];
+	nr_ch11 = nr_of_netw_per_ch[10];
+
+	nr_ch_lowest = nr_ch1;
+	if(nr_ch_lowest > nr_ch6)  nr_ch_lowest = nr_ch6;
+	if(nr_ch_lowest > nr_ch11) nr_ch_lowest = nr_ch11;
+
+	// print the info on the screen
+	tft.print(nr_of_netw_buff);
+	tft.print(" network(s) found -- suggested ch: ");
+	if(nr_ch1 == nr_ch_lowest){
+		tft.print("1");
+
+		if(nr_ch6 == nr_ch_lowest)  tft.print(", 6");
+		if(nr_ch11 == nr_ch_lowest) tft.print(", 11");
+	}
+	else if(nr_ch6 == nr_ch_lowest){
+		tft.print("6");
+
+		if(nr_ch11 == nr_ch_lowest) tft.print(", 11");
+	}
+	else{
+		tft.print("11");
+	}
 }
 
 void update_nr_of_netw_per_ch(){
