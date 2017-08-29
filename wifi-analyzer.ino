@@ -2,6 +2,7 @@
 #include "Adafruit_GFX.h"
 #include "Adafruit_ILI9341.h"
 #include "ESP8266WiFi.h"
+#include "user_interface.h"
 
 /*
     GPIO    NodeMCU   Name  |   Uno
@@ -14,10 +15,11 @@
      2        D4      DC    |   D9
      0        D3      RST   |   D8
 
-
 */
+
+#define UPDATE_INTERVAL 5000
 #define ESP8266
-#define DEBUG
+//#define DEBUG
 
 #ifdef ESP8266
 	#define TFT_MISO 12
@@ -40,203 +42,227 @@
 #define SCR_WIDTH  320
 #define SCR_HEIGHT 240
 
+// ch_coord[] stores the pixel coord of the center of the 13 channels
 const int ch_coord[15] = {23, 43, 64, 85, 106, 127, 148, 169, 190, 211, 232, 253, 274, 295, 314};
-const int ch_color[13] = {0xF800, //red
-                    0x07E0, //green
-                    0xF81F, //magenta
-                    0x07FF, //cyan
-                    0xF810, //pink
-                    0xFFE0, //yellow
-                    0x001F, //blue
-                    0xF800, //red
-                    0x07E0, //green
-                    0xF81F, //magenta
-                    0x07FF, //cyan
-                    0xFFE0, //yellow
-                    0x001F  //blue
-                   };
 
+// ch_color[] stores the different colors of the 13 channels
+const int ch_color[13] =		
+				{0xF800, //red
+				0x07E0, //green
+				0xF81F, //magenta
+				0x07FF, //cyan
+				0xF810, //pink
+				0xFFE0, //yellow
+				0x001F, //blue
+				0xF800, //red
+				0x07E0, //green
+				0xF81F, //magenta
+				0x07FF, //cyan
+				0xFFE0, //yellow
+				0x001F  //blue
+			};
+
+// nr_of_netw_per_ch[] stores the amount of networks that use each channel
 int nr_of_netw_per_ch[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-const char* const encryption_type_table[] = {
-  "",
-  "",
-  "WPA/PSK",
-  "",
-  "WPA2/PSK",
-  "WEP",
-  "",
-  "open netw",
-  "WPA/WPA2/PSK"
-}; // all const
+int nr_of_netw = 0;			// stores total nr of netw discoverd in current scan
+int wait_state = 0;			// used for 'running' animation
+char wait[5] = "/-\\|";		// used for 'running' animation
+char nr_of_netw_buff[5];	// used to pad the nr of networks
+bool refresh_flag = false;	// used as flag when networks are refreshed
 
-Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_MOSI, TFT_CLK, TFT_RST, TFT_MISO);
-//Adafruit_ILI9341 tft = Adafruit_ILI9341(10, 9, 11, 13, 8, 12);  
+// wrapper for controlling the tft screen
+Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_MOSI, TFT_CLK, TFT_RST, TFT_MISO);;
 
+// wrapper for timer used to refresh networks
+os_timer_t refresh_timer;
+
+
+// callback for refresh timer
+void timer_callback(void *pArg) {
+	refresh_flag = true;
+}
 
 void setup(){
-  Serial.begin(115200);
-  randomSeed(analogRead(0));
+	// start the serial communictation (used for debugging => #define DEBUG)
+	Serial.begin(115200);
 
-  // Set WiFi to station mode and disconnect from an AP if it was previously connected
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  delay(100);
+	// set WiFi to station mode and disconnect from an AP (if it was previously connected)
+	WiFi.mode(WIFI_STA);
+	WiFi.disconnect();
+	delay(100);
 
-  Serial.println("WiFi setup done");
+	#ifdef DEBUG
+		Serial.printf("wifi setup done\n");
+	#endif
   
 
-  // start the screen
-  tft.begin();
+	// start the screen and set the correct rotation
+	// pinheaders are on the left side in this case
+	tft.begin();
+	tft.setRotation(3);
 
-  // set the correct rotation of screen
-  // pinheaders are on the left side in this case
-  tft.setRotation(3);
+	#ifdef DEBUG
+		Serial.printf("tft setup done\n");
+	#endif
 
-  // setup the cursor for text
-  tft.setCursor(0, 0);
-  tft.setTextColor(ILI9341_WHITE);
-//  tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
-  tft.setTextSize(1);
-  tft.setTextWrap(false);
+
+	// setup the cursor for text
+	tft.setCursor(0, 0);
+	tft.setTextColor(ILI9341_WHITE);
+	tft.setTextSize(1);
+	tft.setTextWrap(false);
 
   // reset the screen => make is completely black
   tft.fillScreen(ILI9341_BLACK);
 
-  /***** HEADER *****/
-  // draw the top red header bar
-  tft.fillRect(0, 0, 320, 19, ILI9341_RED);
+	// create the red top header bar
+	tft.fillRect(0, 0, 320, 19, ILI9341_RED);
+	tft.setCursor(34, 2);
+	tft.setTextSize(2);
+	tft.print("ESP8266 WiFi Analyzer");
 
-  // show ESP8266 WiFi Analyzer text in this red header
-  tft.setCursor(34, 2);
-  tft.setTextSize(2);
-  tft.print("ESP8266 WiFi Analyzer");
+	// show general info about the networks, show 0 netw found at startup
+	update_general_netw_info(0);
 
-  // show general info about the networks, show 0 netw found at startup
-  update_general_netw_info(0);
+	// draw the box that contains the signal triangles
+	tft.drawRect(22, 30, 294, 190, ILI9341_WHITE);
 
-  // draw the box that contains the signal triangles
-  tft.drawRect(22, 30, 294, 190, ILI9341_WHITE);
-  /***** END HEADER *****/
+	// create the vertical axis
+	//	 => draw tickmarks on the vertical axis to indicate sign strength
+	//  => also draw vertical lines to extend these tickmarks (in a subtle color)
+	for(int i = 38; i < 218; i+= 10){
+		tft.drawPixel(23, i, ILI9341_WHITE);
+		tft.drawPixel(24, i, ILI9341_WHITE);
 
+		tft.drawFastHLine(25, i, 290, 0x2104);
+	}
 
-  /***** Y AXIS *****/
-  // draw tickmarks on the vertical axis to indicate sign strength
-  // also draw vertical lines to extend these tickmarks (in a subtle color)
-  for(int i = 38; i < 218; i+= 10){
-    tft.drawPixel(23, i, ILI9341_WHITE);
-    tft.drawPixel(24, i, ILI9341_WHITE);
+	//  => show the signal strength on the vertical axis (y-axis values)
+	//  => also, print the unit first (dBm)
+	tft.setCursor(2, 22);
+	tft.print("dBm");
 
-    tft.drawFastHLine(25, i, 290, 0x2104);
-  }
+	for(int i = 8; i <= 90; i += 10){
+		tft.setCursor(2, i * 2 + 20);
+		tft.print("-");
+		tft.print(i + 2, DEC);
+	}
 
-  // show the signal strength on the vertical axis (y-axis values)
-  // print the unit first (dBm)
-  tft.setCursor(2, 22);
-  tft.print("dBm");
-  // print all the values left of the tickmarks
-  for(int i = 8; i <= 90; i += 10){
-    tft.setCursor(2, i * 2 + 20);
-    tft.print("-");
-    tft.print(i + 2, DEC);
-  }
-  /***** END Y AXIS *****/
-
-
-  /***** X AXIS *****/
-  // draw tick marks on horizontal axis to idicate the channels 1-13
-  for(int i = 1; i < 14; i++){
-    tft.drawPixel(ch_coord[i], 218, ILI9341_WHITE);
-  }
+	// draw tick marks on horizontal axis to idicate the channels 1-13
+	for(int i = 1; i < 14; i++){
+		tft.drawPixel(ch_coord[i], 218, ILI9341_WHITE);
+	}
   
-  // show channel numbers on horizontal axis (x-axis values)
-  tft.setTextColor(ILI9341_WHITE);
-  tft.setCursor(0, 223);
-  tft.print("   ch");
+	// show channel numbers on horizontal axis (x-axis values)
+	tft.setTextColor(ILI9341_WHITE);
+	tft.setCursor(0, 223);
+	tft.print("   ch");
     
-  int ch_nr = 0;
-  for(int i = 41; i <= 290; i += 21){
-    tft.setTextColor(ch_color[ch_nr]);
-    tft.setCursor(i, 223);
-    tft.print(ch_nr + 1, DEC);
-    ch_nr++;
+	int ch_nr = 0;
+	for(int i = 41; i <= 290; i += 21){
+		tft.setTextColor(ch_color[ch_nr]);
+		tft.setCursor(i, 223);
+		tft.print(ch_nr + 1, DEC);
+		ch_nr++;
 
-    // numbers 10-13 need a slightly different alignment, which is fixed here
-    if(i == 209){
-      i = 206;
-    }
-  }
+		// numbers 10-13 need a slightly different alignment, which is fixed here
+		if(i == 209){
+			i = 206;
+		}
+	}
 
-  // show nr of networks found on each channel below the channel nr
-  tft.setTextColor(ILI9341_WHITE);
-  tft.setCursor(0, 232);
-  tft.print("#netw");
-  update_nr_of_netw_per_ch();
+	// show nr of networks found on each channel below the channel nr
+	tft.setTextColor(ILI9341_WHITE);
+	tft.setCursor(0, 232);
+	tft.print("#netw");
 
-  /***** END X AXIS *****/
+	// reset the text to it's default
+	tft.setCursor(0, 0);
+	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+	tft.setTextSize(1);
 
+	// set up the refresh timer
+	os_timer_setfn(&refresh_timer, timer_callback, NULL);
+	#ifdef DEBUG
+		Serial.printf("timer setup done\n");
+	#endif
 
-  tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+	// start the timer
+	os_timer_arm(&refresh_timer, UPDATE_INTERVAL, true);
 }
 
 
-int i = 0;
-int nr_of_netw = 0;
-char wait[5] = "/-\\|";
-char nr_of_netw_buff[5];
+
 
 void loop(void) {
-  #ifdef DEBUG
-    Serial.printf("scan started\n");
-  #endif
+//	update_wait_state();
+	tft.setCursor(306, 21);
+	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+	tft.print(wait[wait_state]);
 
-  // scan for networks
-  nr_of_netw = WiFi.scanNetworks(false, true);  // check for amount of networks
-                                                // 1st arg: don't use async scanning
-                                                // 2nd arg: show hidden netw
-  #ifdef DEBUG
-    Serial.printf("scan done\n");
-  #endif
-  
-  // update info about networks
-  update_general_netw_info(nr_of_netw);
+	if(wait_state < 3){
+		wait_state++;
+	}
+	else{
+		wait_state = 0;
 
-  // clear the screen
-  clear_netw_screen();
+		// draw extra pixel in the center of |, because there is no pixel there for some reason
+		tft.drawPixel(308, 24, ILI9341_WHITE);
+	}
 
-  // run through all discovered networks, update the amount of networks per channel
-  // and draw each network on the screen
-  for(int i = 0; i < nr_of_netw; ++i){
-    nr_of_netw_per_ch[WiFi.channel(i) - 1]++;
-    draw_netw_str(WiFi.channel(i), WiFi.RSSI(i), WiFi.SSID(i).c_str(), WiFi.encryptionType(i) != ENC_TYPE_NONE);
-  }
+	delay(100);
 
-  // update the networks per channel counters
-  update_nr_of_netw_per_ch();
+	if(refresh_flag){
+		refresh_flag = false;
 
-  // debugging info for terminal of each discovered network
-  #ifdef DEBUG
-    if(nr_of_netw == 0){
-      Serial.printf("no networks found\n");
-    }
-    else{
-      Serial.printf("%d network(s) found\n", nr_of_netw);
-      Serial.printf("==================\n");
-      Serial.printf("nr   SSID           ch | strength | security\n");
-      Serial.printf("------------------\n");
-      
-      for(int i = 0; i < nr_of_netw; ++i){
-        Serial.printf("#%d: %s @ ch:%d (%ddBm) %s\n", i + 1, WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), WiFi.encryptionType(i) == ENC_TYPE_NONE ? "open" : "");
-      }
-    }
-    Serial.printf("\n");
-  #endif
+		#ifdef DEBUG
+			Serial.printf("scan started\n");
+		#endif
 
+		// scan for networks
+		nr_of_netw = WiFi.scanNetworks(false, true);
 
+		#ifdef DEBUG
+			Serial.printf("scan done\n");
+		#endif
+	  
+		// update info about networks
+		update_general_netw_info(nr_of_netw);
 
-  // Wait a bit before scanning again
-  delay(2000); 
+		// clear the screen
+		clear_netw_screen();
+
+		// run through all discovered networks, update the amount of networks per channel
+		// and draw each network on the screen
+		for(int i = 0; i < nr_of_netw; ++i){
+			nr_of_netw_per_ch[WiFi.channel(i) - 1]++;
+			draw_netw_str(WiFi.channel(i), WiFi.RSSI(i), WiFi.SSID(i).c_str(), WiFi.encryptionType(i) != ENC_TYPE_NONE);
+		}
+
+		// update the networks per channel counters
+		update_nr_of_netw_per_ch();
+
+		// debugging info for terminal of each discovered network
+		#ifdef DEBUG
+			if(nr_of_netw == 0){
+				Serial.printf("no networks found\n");
+			}
+			else{
+				Serial.printf("%d network(s) found\n", nr_of_netw);
+				Serial.printf("==================\n");
+				Serial.printf("nr   SSID           ch | strength | security\n");
+				Serial.printf("------------------\n");
+
+				for(int i = 0; i < nr_of_netw; ++i){
+					Serial.printf("#%d: %s @ ch:%d (%ddBm) %s\n", i + 1, WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), WiFi.encryptionType(i) == ENC_TYPE_NONE ? "open" : "");
+				}
+			}
+			Serial.printf("\n");
+		#endif
+	 } 
 }
+
 
 void update_general_netw_info(int nr_of_netw){
   // setup cursor and font
