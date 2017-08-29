@@ -14,20 +14,28 @@
      2        D4      DC    |   D9
      0        D3      RST   |   D8
 
-#define TFT_MISO 12
-#define TFT_CLK  13
-#define TFT_MOSI 11
-#define TFT_DC    9
-#define TFT_RST   8
-#define TFT_CS   10
-*/
 
-#define TFT_MISO 12
-#define TFT_CLK  14
-#define TFT_MOSI 13
-#define TFT_DC    2
-#define TFT_RST   0
-#define TFT_CS   15
+*/
+#define ESP8266
+#define DEBUG
+
+#ifdef ESP8266
+	#define TFT_MISO 12
+	#define TFT_CLK  14
+	#define TFT_MOSI 13
+	#define TFT_DC    2
+	#define TFT_RST   0
+	#define TFT_CS   15
+#endif
+
+#ifdef UNO
+	#define TFT_MISO 12
+	#define TFT_CLK  13
+	#define TFT_MOSI 11
+	#define TFT_DC    9
+	#define TFT_RST   8
+	#define TFT_CS   10
+#endif
 
 #define SCR_WIDTH  320
 #define SCR_HEIGHT 240
@@ -142,6 +150,10 @@ void setup(){
   }
   
   // show channel numbers on horizontal axis (x-axis values)
+  tft.setTextColor(ILI9341_WHITE);
+  tft.setCursor(0, 223);
+  tft.print("   ch");
+    
   int ch_nr = 0;
   for(int i = 41; i <= 290; i += 21){
     tft.setTextColor(ch_color[ch_nr]);
@@ -156,52 +168,13 @@ void setup(){
   }
 
   // show nr of networks found on each channel below the channel nr
+  tft.setTextColor(ILI9341_WHITE);
+  tft.setCursor(0, 232);
+  tft.print("#netw");
   update_nr_of_netw_per_ch();
-  /*
-  ch_nr = 0;
-  for(int i = 35; i <= 290; i += 21){
-    tft.setTextColor(ch_color[ch_nr]);
-    tft.setCursor(i, 232);
-    
-    //int temp = random(0, 15);
-    int temp = nr_of_netw_per_ch[ch_nr];
-    if(temp == 0)     tft.print("   ");
-    else if(temp > 9) tft.print("(x)");
-    else{
-      tft.print("(");
-      tft.print(temp, DEC);
-      tft.print(")");
-    }
-    
-    ch_nr++;
-  }
-  */
+
   /***** END X AXIS *****/
 
-  // testing...
-  /*
-  draw_netw_str(1, -90, "THEUWIS", true);
-  draw_netw_str(5, -10, "test", false);
-  draw_netw_str(6, -50, "hallo", true);
-  draw_netw_str(11, -45, "de wifi", false);
-  */
-  /*
-  for(int i = 0; i < 13; i++){
-    int sig_str = random(60, 180);
-    tft.drawTriangle(ch_coord[i], 219, ch_coord[i + 1], sig_str, ch_coord[i + 2], 219, ch_color[i]);
-
-    tft.setCursor(ch_coord[i + 1] - 6, sig_str - 9);
-    tft.setTextColor(ch_color[i]);
-    tft.print("THEUWIS"); //TODO enkel x-aantal letters printen voor lange namen..
-                          //TODO sign str (-85) + * als gn beveiliging
-                          //TODO hoeveelheid netw per ch aanpassen
-  }
-
-  tft.drawFastHLine(22, 219, 294, ILI9341_WHITE);
-  for(int i = 43; i <= 295; i += 21){
-    tft.drawPixel(i, 218, ILI9341_WHITE);
-  }
-  */
 
   tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
 }
@@ -318,8 +291,6 @@ void clear_netw_screen(){
   tft.fillRect( 23, 31, 292, 188, ILI9341_BLACK);
   tft.fillRect(316, 30,   3, 189, ILI9341_BLACK); // part right of the box, where names sometimes appear
   tft.drawFastVLine(315, 30, 190, ILI9341_WHITE);
-
-  //tft.drawRect(22, 30, 294, 190, ILI9341_WHITE);
 
   // redraw the vertical and horizontal tickmarks
   for(int i = 38; i < 218; i+= 10){
