@@ -1,8 +1,15 @@
+#include <stdio.h>
+#include <string.h>
 #include "SPI.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_ILI9341.h"
 #include "ESP8266WiFi.h"
 #include "user_interface.h"
+
+
+//TODO namen max 7 ch
+//TODO timer zelf resetten => loopt nu gewoon door denk ik (bool op true)
+//TODO update van sugg ch moet beter! (maak string op voorhand via concat ofzo)
 
 /*
     GPIO    NodeMCU   Name  |   Uno
@@ -17,7 +24,7 @@
 
 */
 
-#define UPDATE_INTERVAL 5000
+#define UPDATE_INTERVAL 2000
 #define ESP8266
 //#define DEBUG
 
@@ -260,6 +267,7 @@ void loop(void) {
 
 
 void update_idle(){
+	/*
 	tft.setCursor(306, 21);
 	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
 	tft.print(idle[idle_state]);
@@ -273,46 +281,47 @@ void update_idle(){
 		// draw extra pixel in the center of |, because there is no pixel there for some reason
 		tft.drawPixel(308, 24, ILI9341_WHITE);
 	}
+	*/
 }
 
 
-
 void update_general_netw_info(int nr_of_netw){
-	// setup cursor and font, and clear previous text
-	tft.setCursor(20, 20);
-	tft.setTextSize(1);
-	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
-	tft.fillRect(20, 20, 280, 8, ILI9341_BLACK);
-
-	// pad the nr of netw with spaces on the right (always 3 char)
-	sprintf(nr_of_netw_buff, "%3d", nr_of_netw);
-
 	// calculate best netw (least crowded on ch 1, 6, 11)
+	// dummy variables for easier typing
 	nr_ch1  = nr_of_netw_per_ch[0];
 	nr_ch6  = nr_of_netw_per_ch[5];
 	nr_ch11 = nr_of_netw_per_ch[10];
 
+	// calculate lowest amount of netw over 3 ch
 	nr_ch_lowest = nr_ch1;
 	if(nr_ch_lowest > nr_ch6)  nr_ch_lowest = nr_ch6;
 	if(nr_ch_lowest > nr_ch11) nr_ch_lowest = nr_ch11;
 
-	// print the info on the screen
-	tft.print(nr_of_netw_buff);
-	tft.print(" network(s) found -- suggested ch: ");
-	if(nr_ch1 == nr_ch_lowest){
-		tft.print("1");
+	// create a string for the best networks
+	char sugg_ch_buff[15] = "";
+	memset(sugg_ch_buff, 0, sizeof(sugg_ch_buff));
 
-		if(nr_ch6 == nr_ch_lowest)  tft.print(", 6");
-		if(nr_ch11 == nr_ch_lowest) tft.print(", 11");
+	if(nr_ch1 == nr_ch_lowest){
+		strcat(sugg_ch_buff, "1");
+
+		if(nr_ch6 == nr_ch_lowest)  strcat(sugg_ch_buff, ", 6");
+		if(nr_ch11 == nr_ch_lowest) strcat(sugg_ch_buff, ", 11");
 	}
 	else if(nr_ch6 == nr_ch_lowest){
-		tft.print("6");
+		strcat(sugg_ch_buff, "6");
 
-		if(nr_ch11 == nr_ch_lowest) tft.print(", 11");
+		if(nr_ch11 == nr_ch_lowest) strcat(sugg_ch_buff, ", 11");
 	}
 	else{
-		tft.print("11");
+		strcat(sugg_ch_buff, "11");
 	}
+
+	// print the info on the screen
+	// nr_of_netw get padded to 3 digits (right justified), sugg_ch gets padded to 8
+	tft.setCursor(20, 20);
+	tft.setTextSize(1);
+	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+	tft.printf("%3d network(s) found -- suggested ch: %-8s", nr_of_netw, sugg_ch_buff);	
 }
 
 void update_nr_of_netw_per_ch(){
@@ -386,6 +395,6 @@ void draw_netw_str(int ch, int sig_str, const char * ssid, bool protc){
     tft.setCursor(ch_coord[ch] - 5, sig_str_coord - 9);
     tft.setTextColor(ch_color[ch - 1]);
     tft.printf("%s (%ddB)", ssid, sig_str);
-    if(!protc) tft.print("(*)");
+    if(!protc) tft.print("*");
   }
 }
