@@ -9,7 +9,7 @@
 
 //TODO namen max 7 ch
 //TODO timer zelf resetten => loopt nu gewoon door denk ik (bool op true)
-//TODO update van sugg ch moet beter! (maak string op voorhand via concat ofzo)
+
 
 /*
     GPIO    NodeMCU   Name  |   Uno
@@ -25,7 +25,13 @@
 */
 
 #define UPDATE_INTERVAL 2000
+#define MAX_SSID_LEN    7
+#define SCR_WIDTH  320
+#define SCR_HEIGHT 240
+
+
 #define ESP8266
+//#define UNO
 //#define DEBUG
 
 #ifdef ESP8266
@@ -46,15 +52,14 @@
 	#define TFT_CS   10
 #endif
 
-#define SCR_WIDTH  320
-#define SCR_HEIGHT 240
+
 
 // ch_coord[] stores the pixel coord of the center of the 13 channels
 const int ch_coord[15] = {23, 43, 64, 85, 106, 127, 148, 169, 190, 211, 232, 253, 274, 295, 314};
 
 // ch_color[] stores the different colors of the 13 channels
-const int ch_color[13] =		
-				{0xF800, //red
+const int ch_color[13] = {		
+				0xF800, //red
 				0x07E0, //green
 				0xF81F, //magenta
 				0x07FF, //cyan
@@ -378,23 +383,31 @@ void clear_netw_screen(){
 }
 
 void draw_netw_str(int ch, int sig_str, const char * ssid, bool protc){
-  // convert sign strength (dBm) to coordinates
-  int sig_str_coord = (-sig_str * 2) + 18;
+	// convert sign strength (dBm) to coordinates
+	int sig_str_coord = (-sig_str * 2) + 18;
 
-  if(sig_str_coord < 220 && sig_str_coord > 20){
-    // draw the signal and redraw the bottom white line
-    tft.drawTriangle(ch_coord[ch - 1], 219, ch_coord[ch], sig_str_coord, ch_coord[ch + 1], 219, ch_color[ch - 1]);
-    tft.drawFastHLine(ch_coord[ch - 1], 219, 45, ILI9341_WHITE);
-    
-    // redraw tick marks on horizontal axis to idicate the channels 1-13
-    for(int i = 1; i < 14; i++){
-      tft.drawPixel(ch_coord[i], 218, ILI9341_WHITE);
-    }
-  
-    // show SSID, strength and if the netw is protected or not (*)
-    tft.setCursor(ch_coord[ch] - 5, sig_str_coord - 9);
-    tft.setTextColor(ch_color[ch - 1]);
-    tft.printf("%s (%ddB)", ssid, sig_str);
-    if(!protc) tft.print("*");
-  }
+	// crop the SSID to a max length of MAX_SSID_LEN
+	// append with '$' if the SSID is too long
+	char temp[50];
+	memset(temp, 0, sizeof(temp));
+	strncpy(temp, ssid, MAX_SSID_LEN);
+	if(strlen(ssid) > MAX_SSID_LEN) temp[MAX_SSID_LEN - 1] = '$';
+
+	// draw the signal, sign str that are too high (>0dBm) or too low (<-100dBm)
+	if(sig_str_coord <= 220 && sig_str_coord > 20){
+		// draw the signal and redraw the bottom white line
+		tft.drawTriangle(ch_coord[ch - 1], 219, ch_coord[ch], sig_str_coord, ch_coord[ch + 1], 219, ch_color[ch - 1]);
+		tft.drawFastHLine(ch_coord[ch - 1], 219, 45, ILI9341_WHITE);
+
+		// redraw tick marks on horizontal axis to idicate the channels 1-13
+		for(int i = 1; i < 14; i++){
+			tft.drawPixel(ch_coord[i], 218, ILI9341_WHITE);
+		}
+
+		// show SSID, strength and if the netw is protected or not (*)
+		tft.setCursor(ch_coord[ch] - 5, sig_str_coord - 9);
+		tft.setTextColor(ch_color[ch - 1]);
+		tft.printf("%s (%ddB)", temp, sig_str);
+		if(!protc) tft.print("*");
+	}
 }
