@@ -7,7 +7,7 @@
 #include "user_interface.h"
 
 
-//TODO namen max 7 ch
+
 //TODO timer zelf resetten => loopt nu gewoon door denk ik (bool op true)
 
 
@@ -364,22 +364,21 @@ void update_nr_of_netw_per_ch(){
 }
 
 void clear_netw_screen(){
-  // clear the screen
-  tft.fillRect( 23, 31, 292, 188, ILI9341_BLACK);
-  tft.fillRect(316, 30,   3, 189, ILI9341_BLACK); // part right of the box, where names sometimes appear
-  tft.drawFastVLine(315, 30, 190, ILI9341_WHITE);
+	// clear the screen
+	tft.fillRect( 23, 31, 292, 188, ILI9341_BLACK); // clear content of the bounding box
+	tft.fillRect(316, 30,   3, 189, ILI9341_BLACK); // fixes the part right of the box, where names sometimes appear
+	tft.drawFastVLine(315, 30, 190, ILI9341_WHITE); // redraw the right line of the bounding box
 
-  // redraw the vertical and horizontal tickmarks
-  for(int i = 38; i < 218; i+= 10){
-    tft.drawPixel(23, i, ILI9341_WHITE);
-    tft.drawPixel(24, i, ILI9341_WHITE);
+	// redraw the vertical and horizontal tickmarks
+	for(int i = 38; i < 218; i+= 10){
+		tft.drawPixel(23, i, ILI9341_WHITE);
+		tft.drawPixel(24, i, ILI9341_WHITE);
 
-    tft.drawFastHLine(25, i, 290, 0x2104);
-  }
-  for(int i = 1; i < 14; i++){
-    tft.drawPixel(ch_coord[i], 218, ILI9341_WHITE);
-  }
-  
+		tft.drawFastHLine(25, i, 290, 0x2104);
+	}
+	for(int i = 1; i < 14; i++){
+		tft.drawPixel(ch_coord[i], 218, ILI9341_WHITE);
+	} 
 }
 
 void draw_netw_str(int ch, int sig_str, const char * ssid, bool protc){
