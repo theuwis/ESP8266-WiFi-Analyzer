@@ -121,8 +121,8 @@ void setup(){
 	tft.setTextSize(1);
 	tft.setTextWrap(false);
 
-  // reset the screen => make is completely black
-  tft.fillScreen(ILI9341_BLACK);
+	// reset the screen => make is completely black
+	tft.fillScreen(ILI9341_BLACK);
 
 	// create the red top header bar
 	tft.fillRect(0, 0, 320, 19, ILI9341_RED);
