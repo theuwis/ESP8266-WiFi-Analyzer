@@ -6,22 +6,16 @@
 #include "ESP8266WiFi.h"
 #include "user_interface.h"
 
-
-
-//TODO timer zelf resetten => loopt nu gewoon door denk ik (bool op true)
-
-
 /*
-    GPIO    NodeMCU   Name  |   Uno
-  ===================================
-     15       D8      CS    |   D10
-     13       D7      MOSI  |   D11
-     12       D6      MISO  |   D12
-     14       D5      SCK   |   D13
+	GPIO	NodeMCU	Name	|	Uno
+	============================
+	15		D8			CS		|	D10
+	13		D7			MOSI 	| 	D11
+	12		D6			MISO 	| 	D12
+	14		D5			CLK 	| 	D13
 
-     2        D4      DC    |   D9
-     0        D3      RST   |   D8
-
+	 2		D4			DC 	| 	D9
+	 0		D3			RST	| 	D8
 */
 
 #define UPDATE_INTERVAL 2000
@@ -331,7 +325,7 @@ void update_general_netw_info(int nr_of_netw){
 	tft.setCursor(20, 20);
 	tft.setTextSize(1);
 	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
-	tft.printf("%3d network(s) found -- suggested ch: %-8s", nr_of_netw, sugg_ch_buff);	
+	tft.printf("%3d network(s) found -- suggested ch: %-8s", nr_of_netw, sugg_ch_buff);
 }
 
 void update_nr_of_netw_per_ch(){
