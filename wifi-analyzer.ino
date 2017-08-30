@@ -202,8 +202,8 @@ void setup(){
 		Serial.printf("timer setup done\n");
 	#endif
 
-	// start the timer
-	os_timer_arm(&refresh_timer, UPDATE_INTERVAL, true);
+	// start the timer, only runs once (repeat = false), gets started again when the scanning is done
+	os_timer_arm(&refresh_timer, UPDATE_INTERVAL, false);
 }
 
 
@@ -211,7 +211,6 @@ void setup(){
 
 void loop(void) {
 	update_idle();
-//	delay(100);
 
 	if(refresh_flag){
 		refresh_flag = false;
@@ -272,12 +271,14 @@ void loop(void) {
 			}
 			Serial.printf("\n");
 		#endif
-	 } 
+
+		// restart the timer
+		os_timer_arm(&refresh_timer, UPDATE_INTERVAL, false);
+	} 
 }
 
 
 void update_idle(){
-	/*
 	tft.setCursor(306, 21);
 	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
 	tft.print(idle[idle_state]);
@@ -291,7 +292,6 @@ void update_idle(){
 		// draw extra pixel in the center of |, because there is no pixel there for some reason
 		tft.drawPixel(308, 24, ILI9341_WHITE);
 	}
-	*/
 }
 
 
