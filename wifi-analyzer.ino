@@ -233,6 +233,11 @@ void loop(void) {
 		clear_netw_screen();
 		update_idle();
 
+		// reset the number of networks for all channels before starting the scan
+		for(int i = 0; i < 13; i++){
+			nr_of_netw_per_ch[i] = 0;
+		}
+
 		// run through all discovered networks, update the amount of networks per channel
 		// and draw each network on the screen
 		for(int i = 0; i < nr_of_netw; ++i){
@@ -330,37 +335,29 @@ void update_general_netw_info(int nr_of_netw){
 }
 
 void update_nr_of_netw_per_ch(){
-  int ch_nr = 0;
+	// iterate over all 13 channels
+	for(int ch_nr = 0; ch_nr < 13; ch_nr++){
+		// update the cursor position and color, to match channel color
+		// the position is 1 ch shifted to the left, so -8 pixels
+		tft.setCursor(ch_coord[ch_nr + 1] - 8, 232);
+		tft.setTextColor(ch_color[ch_nr], ILI9341_BLACK);
 
-  // iterate over all 13 channels
-  for(int i = 35; i <= 290; i += 21){
-    // update the cursor position and color, to match channel color
-    tft.setCursor(i, 232);
-    tft.setTextColor(ch_color[ch_nr], ILI9341_BLACK);
-
-    // print the amount of networks in the channel, exceptions are:
-    //  - no netw  => don't show a number (print spaces to overwrite prev data)
-    //  - >9 netw  => print (x), since two digits are too big to display
-    //  - >0 & <10 => print nr of netw
-    if(nr_of_netw_per_ch[ch_nr] == 0){
-      tft.print("   ");
-    }
-    else if(nr_of_netw_per_ch[ch_nr] > 9){
-      tft.print("(x)");
-    }
-    else{
-      tft.print("(");
-      tft.print(nr_of_netw_per_ch[ch_nr], DEC);
-      tft.print(")");
-    }
-
-    ch_nr++;
-  }
-
-  // reset the number of networks for all channels for the next scan
-  for(int i = 0; i < 13; i++){
-    nr_of_netw_per_ch[i] = 0;
-  }
+		// print the amount of networks in the channel, exceptions are:
+		//  - no netw  => don't show a number (print spaces to overwrite prev data)
+		//  - >9 netw  => print (x), since two digits are too big to display
+		//  - >0 & <10 => print nr of netw
+		if(nr_of_netw_per_ch[ch_nr] == 0){
+			tft.print("   ");
+		}
+		else if(nr_of_netw_per_ch[ch_nr] > 9){
+			tft.print("(x)");
+		}
+		else{
+			tft.print("(");
+			tft.print(nr_of_netw_per_ch[ch_nr], DEC);
+			tft.print(")");
+		}
+	}
 }
 
 void clear_netw_screen(){
